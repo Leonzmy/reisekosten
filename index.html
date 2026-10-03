@@ -84,6 +84,7 @@
     padding: .65rem .8rem;
   }
   textarea { min-height: 6rem; resize: vertical; }
+  input[readonly] { background: var(--papier); color: var(--grau); cursor: default; }
   input[type=file] { width: 100%; font: inherit; font-size: .95rem; padding: .6rem; background: var(--flaeche); border: 1px dashed var(--linie); border-radius: 6px; }
   input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
     outline: 2px solid var(--signal); outline-offset: 2px;
@@ -189,11 +190,6 @@
 
     <fieldset>
       <legend><span class="nr">2</span> Die Fahrt</legend>
-      <div class="feld">
-        <label for="reisedatum">Reisedatum</label>
-        <input type="date" id="reisedatum" name="reisedatum" required>
-        <p class="warnung" id="datumswarnung" hidden></p>
-      </div>
       <div class="zweispaltig">
         <div class="feld">
           <label for="von">Von</label>
@@ -202,9 +198,28 @@
         <div class="feld">
           <label for="nach">Nach</label>
           <input type="text" id="nach" name="nach" required maxlength="200" placeholder="z. B. München">
+          <p class="hilfe" id="nach-hinweis" hidden>Für dieses Projekt festgelegt.</p>
         </div>
       </div>
-      <p class="hilfe" style="margin:-.6rem 0 1.1rem">Pro Fahrt bitte eine Einreichung. Hin- und Rückfahrt mit demselben Verkehrsmittel können Sie zusammen einreichen.</p>
+      <div class="feld" role="radiogroup" aria-labelledby="fahrtart-label">
+        <span class="gruppe-label" id="fahrtart-label">Fahrt</span>
+        <div class="kacheln zwei">
+          <label class="kachel"><input type="radio" name="fahrtart" value="Einfache Fahrt" required><span>Einfache Fahrt</span></label>
+          <label class="kachel"><input type="radio" name="fahrtart" value="Hin- und Rückfahrt"><span>Hin- und Rückfahrt</span></label>
+        </div>
+      </div>
+      <div class="zweispaltig">
+        <div class="feld">
+          <label for="reisedatum" id="reisedatum-label">Reisedatum</label>
+          <input type="date" id="reisedatum" name="reisedatum" required>
+        </div>
+        <div class="feld" id="rueck-feld" hidden>
+          <label for="rueckreisedatum">Rückfahrt am</label>
+          <input type="date" id="rueckreisedatum" name="rueckreisedatum" required disabled>
+        </div>
+      </div>
+      <p class="warnung" id="datumswarnung" hidden style="margin:-.6rem 0 1.1rem"></p>
+      <p class="hilfe" style="margin:0 0 1.1rem">Hin und zurück mit unterschiedlichen Verkehrsmitteln? Dann reichen Sie bitte jede Fahrt einzeln ein.</p>
       <div class="feld" role="radiogroup" aria-labelledby="vm-label">
         <span class="gruppe-label" id="vm-label">Verkehrsmittel</span>
         <div class="kacheln">
@@ -233,7 +248,7 @@
         <div class="feld">
           <label for="kilometer">Gefahrene Kilometer</label>
           <input type="number" id="kilometer" name="kilometer" inputmode="decimal" min="1" step="0.1" required>
-          <p class="hilfe">Hin- und Rückweg zusammen.</p>
+          <p class="hilfe">Bei Hin- und Rückfahrt beide Strecken zusammen.</p>
         </div>
         <div class="feld">
           <label for="mitfahrende">Mitfahrende aus dem Projekt <span class="optional">(optional)</span></label>
@@ -256,10 +271,10 @@
         <div class="feld">
           <label for="ticketBahn">Ticket oder Rechnung</label>
           <input type="file" id="ticketBahn" data-art="ticket" accept=".pdf,image/*" multiple required>
-          <p class="hilfe">PDF oder Foto, mehrere Dateien möglich.</p>
+          <p class="hilfe">PDF oder Foto. Bei Hin- und Rückfahrt bitte alle Tickets hochladen.</p>
         </div>
         <div class="feld">
-          <label for="betragBahn">Betrag in €</label>
+          <label for="betragBahn">Betrag in € (insgesamt)</label>
           <input type="number" id="betragBahn" inputmode="decimal" min="0.01" step="0.01" required>
         </div>
         <div class="feld" role="radiogroup" aria-labelledby="klasse-label">
@@ -291,7 +306,7 @@
           <input type="file" id="bordkarten" data-art="bordkarte" accept=".pdf,image/*" multiple required>
         </div>
         <div class="feld">
-          <label for="betragFlug">Betrag in €</label>
+          <label for="betragFlug">Betrag in € (insgesamt)</label>
           <input type="number" id="betragFlug" inputmode="decimal" min="0.01" step="0.01" required>
         </div>
         <div class="feld">
@@ -413,6 +428,14 @@ async function init() {
   }
   if (projekt.hinweis) { $('projekthinweis').textContent = projekt.hinweis; $('projekthinweis').hidden = false; }
 
+  if (projekt.zielort) {
+    const nach = $('nach');
+    nach.defaultValue = projekt.zielort; // bleibt auch nach „Weitere Fahrt einreichen“ erhalten
+    nach.value = projekt.zielort;
+    nach.readOnly = true;
+    $('nach-hinweis').hidden = false;
+  }
+
   let p = `Erstattet werden ${euro(projekt.pauschale)} pro Kilometer`;
   if (projekt.maxAuto > 0) p += `, höchstens ${euro(projekt.maxAuto)} pro Fahrt`;
   $('pauschale').textContent = p + '.';
@@ -455,11 +478,13 @@ function berechneErstattung() {
   return null;
 }
 
-function scheinHtml(von, nach, datum, vm, betrag) {
+function scheinHtml(von, nach, hinUndZurueck, datum, rueck, vm, betrag) {
+  const pfeil = hinUndZurueck ? '⇄' : '→';
   const route = von || nach
-    ? `${esc(von || '…')} → ${esc(nach || '…')}`
-    : '<span class="leer">Von → Nach</span>';
-  const details = [datum ? datumDe(datum) : '', vm || ''].filter(Boolean).join(', ') || 'Datum und Verkehrsmittel fehlen noch';
+    ? `${esc(von || '…')} ${pfeil} ${esc(nach || '…')}`
+    : `<span class="leer">Von ${pfeil} Nach</span>`;
+  const daten = [datum, rueck].filter(Boolean).map(datumDe).join(' und ');
+  const details = [daten, vm || ''].filter(Boolean).join(', ') || 'Datum und Verkehrsmittel fehlen noch';
   return `<div class="strecke"><div class="route">${route}</div><div class="details">${esc(details)}</div></div>` +
     `<div class="betrag"><span class="summe">${betrag != null ? euro(betrag) : '–'}</span>` +
     `<span class="summe-label">voraussichtliche Erstattung</span></div>`;
@@ -471,8 +496,9 @@ function esc(s) {
 
 function aktualisiereSchein() {
   if (!projekt) return;
-  $('fahrschein').innerHTML = scheinHtml($('von').value.trim(), $('nach').value.trim(),
-    $('reisedatum').value, form.verkehrsmittel.value, berechneErstattung());
+  const rt = form.fahrtart.value === 'Hin- und Rückfahrt';
+  $('fahrschein').innerHTML = scheinHtml($('von').value.trim(), $('nach').value.trim(), rt,
+    $('reisedatum').value, rt ? $('rueckreisedatum').value : '', form.verkehrsmittel.value, berechneErstattung());
   ausrichtenLochung($('fahrschein'));
 }
 
@@ -482,11 +508,25 @@ function ausrichtenLochung(schein) {
 }
 
 function pruefeDatum() {
-  const d = $('reisedatum').value;
+  const hin = $('reisedatum').value;
+  const rueckFeld = $('rueckreisedatum');
+  const rueck = rueckFeld.disabled ? '' : rueckFeld.value;
+  rueckFeld.min = hin;
+  rueckFeld.setCustomValidity(hin && rueck && rueck < hin ? 'Die Rückfahrt liegt vor der Hinfahrt.' : '');
+  if (!projekt) return;
+  const ausserhalb = d => d && ((projekt.beginn && d < projekt.beginn) || (projekt.ende && d > projekt.ende));
   const w = $('datumswarnung');
-  const ausserhalb = d && ((projekt.beginn && d < projekt.beginn) || (projekt.ende && d > projekt.ende));
-  w.hidden = !ausserhalb;
-  if (ausserhalb) w.textContent = 'Das Datum liegt außerhalb des Projektzeitraums. Sie können trotzdem einreichen, wir prüfen das.';
+  w.hidden = !(ausserhalb(hin) || ausserhalb(rueck));
+  if (!w.hidden) w.textContent = 'Das Datum liegt außerhalb des Projektzeitraums. Sie können trotzdem einreichen, wir prüfen das.';
+}
+
+function setzeFahrtart(art) {
+  const rt = art === 'Hin- und Rückfahrt';
+  $('rueck-feld').hidden = !rt;
+  $('rueckreisedatum').disabled = !rt;
+  $('reisedatum-label').textContent = rt ? 'Hinfahrt am' : 'Reisedatum';
+  pruefeDatum();
+  aktualisiereSchein();
 }
 
 /* ───── IBAN ───── */
@@ -562,7 +602,9 @@ async function sammleDaten() {
     projektId: projekt.id,
     name: $('name').value.trim(),
     email: $('email').value.trim(),
+    fahrtart: form.fahrtart.value,
     reisedatum: $('reisedatum').value,
+    rueckreisedatum: $('rueckreisedatum').disabled ? '' : $('rueckreisedatum').value,
     von: $('von').value.trim(),
     nach: $('nach').value.trim(),
     verkehrsmittel: vm,
@@ -639,7 +681,8 @@ function zeigeErfolg(json, daten) {
   form.hidden = true;
   $('erfolgstext').textContent = `Ihre Einreichung ${json.id} ist eingegangen. Eine Bestätigung geht an ${daten.email}.`;
   const schein = $('erfolgsschein');
-  schein.innerHTML = scheinHtml(daten.von, daten.nach, daten.reisedatum, daten.verkehrsmittel, json.erstattung);
+  schein.innerHTML = scheinHtml(daten.von, daten.nach, daten.fahrtart === 'Hin- und Rückfahrt',
+    daten.reisedatum, daten.rueckreisedatum, daten.verkehrsmittel, json.erstattung);
   $('erfolg').hidden = false;
   ausrichtenLochung(schein);
   window.scrollTo(0, 0);
@@ -650,6 +693,7 @@ $('weitere').addEventListener('click', () => {
   form.reset();
   behalten.forEach(([id, v]) => { $(id).value = v; });
   setzeVerkehrsmittel(null);
+  setzeFahrtart(null);
   $('datumswarnung').hidden = true;
   $('klassenwarnung').hidden = true;
   $('erfolg').hidden = true;
@@ -662,7 +706,8 @@ $('weitere').addEventListener('click', () => {
 form.addEventListener('change', e => {
   if (e.target.name === 'verkehrsmittel') setzeVerkehrsmittel(e.target.value);
   if (e.target.name === 'klasse') $('klassenwarnung').hidden = !(e.target.value === '1. Klasse' && !projekt.ersteKlasseErlaubt);
-  if (e.target.id === 'reisedatum') pruefeDatum();
+  if (e.target.name === 'fahrtart') setzeFahrtart(e.target.value);
+  if (e.target.id === 'reisedatum' || e.target.id === 'rueckreisedatum') pruefeDatum();
 });
 form.addEventListener('input', e => {
   if (e.target.id === 'parkgebuehren') aktualisiereParkbeleg();
