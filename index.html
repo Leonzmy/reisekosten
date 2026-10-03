@@ -219,7 +219,8 @@
         <div class="feld">
           <label for="kilometer">Gefahrene Kilometer</label>
           <input type="number" id="kilometer" name="kilometer" inputmode="decimal" min="1" step="0.1" required>
-          <p class="hilfe">Bei Hin- und Rückfahrt beide Strecken zusammen.</p>
+          <p class="hilfe">Wird aus Start- und Zielort unter „Die Fahrt“ berechnet. Bleibt der Zielort leer, wird der Projektort verwendet.</p>
+          <p class="ausgelesen" id="km-status" hidden aria-live="polite"></p>
         </div>
         <div class="feld">
           <label for="mitfahrende">Mitfahrende aus dem Projekt <span class="optional">(optional)</span></label>
@@ -523,6 +524,7 @@ function setzeVerkehrsmittel(vm) {
   document.querySelectorAll('[data-auslesen]').forEach(el => { el.hidden = true; });
   const aktiv = vm && document.querySelector(`.kosten[data-vm="${vm}"]`);
   if (aktiv && [...aktiv.querySelectorAll('input[type=file]')].some(i => i.files.length)) leseBelege(aktiv);
+  if (vm === 'Auto') berechneKm();
   aktualisiereParkbeleg();
   aktualisiereSchein();
 }
@@ -784,6 +786,45 @@ function uebernehmeWerte(w, abschnitt) {
   return liste;
 }
 
+/* ───── Kilometer für Autofahrten berechnen ───── */
+let kmLauf = 0;
+const fmtKm = n => `${Number(n).toLocaleString('de-DE')} km`;
+const KM_FEHLER = 'Die Strecke konnte nicht berechnet werden. Bitte tragen Sie die Kilometer selbst ein.';
+
+async function berechneKm() {
+  if (!projekt || form.verkehrsmittel.value !== 'Auto') return;
+  const status = $('km-status');
+  const von = $('von').value.trim();
+  status.hidden = false;
+  if (!von) { status.textContent = 'Tragen Sie unter „Die Fahrt“ den Startort ein, dann werden die Kilometer berechnet.'; return; }
+
+  const rt = form.fahrtart.value === 'Hin- und Rückfahrt';
+  const lauf = ++kmLauf;
+  status.textContent = 'Strecke wird berechnet …';
+  try {
+    const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
+      action: 'entfernung', projektId: projekt.id, von, nach: $('nach').value.trim(), hinUndZurueck: rt,
+      rueckVon: rt ? $('rueckVon').value.trim() : '', rueckNach: rt ? $('rueckNach').value.trim() : '',
+    }) });
+    const json = await res.json();
+    if (lauf !== kmLauf) return;
+    if (!json.ok) {
+      status.textContent = KM_FEHLER + (json.fehler && json.fehler[0] ? ` (${json.fehler[0]})` : '');
+      return;
+    }
+    if (!$('nach').value.trim()) { $('nach').value = json.nach; spiegleRueckfahrt(); }
+    const km = $('kilometer');
+    km.value = json.km;
+    delete km.dataset.manuell;
+    status.textContent = (rt
+      ? `Berechnet: Hinfahrt ${fmtKm(json.hinKm)}, Rückfahrt ${fmtKm(json.rueckKm)}, zusammen ${fmtKm(json.km)}.`
+      : `Berechnet: ${von} → ${json.nach}, ${fmtKm(json.km)}.`) + ' Bei Umwegen können Sie den Wert anpassen.';
+    aktualisiereSchein();
+  } catch (err) {
+    if (lauf === kmLauf) status.textContent = KM_FEHLER;
+  }
+}
+
 /* ───── Absenden ───── */
 async function sammleDaten() {
   const vm = form.verkehrsmittel.value;
@@ -898,13 +939,16 @@ $('weitere').addEventListener('click', () => {
 /* ───── Ereignisse ───── */
 form.addEventListener('change', e => {
   verwerfeFremdeingaben();
-  if (istFremdeingabe(e)) return;
-  if (e.isTrusted && e.target.type !== 'file') e.target.dataset.manuell = '1';
+  // „change“ feuert bei Textfeldern erst nach dem Verlassen. Gültig ist, was schon beim Tippen übernommen wurde.
+  const reisefeld = REISEFELDER.includes(e.target.id);
+  if (reisefeld && e.target.value !== (gemerkt[e.target.id] || '')) return;
+  if (e.isTrusted && e.target.type !== 'file' && !reisefeld) e.target.dataset.manuell = '1';
   if (e.target.type === 'file' && e.target.dataset.art !== 'park') leseBelege(e.target.closest('.kosten'));
   if (e.target.name === 'verkehrsmittel') setzeVerkehrsmittel(e.target.value);
   if (e.target.name === 'klasse') $('klassenwarnung').hidden = !(e.target.value === '1. Klasse' && !projekt.ersteKlasseErlaubt);
   if (e.target.name === 'fahrtart') setzeFahrtart(e.target.value);
   if (e.target.id === 'reisedatum' || e.target.id === 'rueckreisedatum') pruefeDatum();
+  if (['von', 'nach', 'rueckVon', 'rueckNach'].includes(e.target.id) || e.target.name === 'fahrtart') berechneKm();
 });
 form.addEventListener('input', e => {
   verwerfeFremdeingaben();
