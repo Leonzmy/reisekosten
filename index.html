@@ -72,6 +72,7 @@
   .optional { font-weight: 400; color: var(--grau); }
   .hilfe { margin: .35rem 0 0; font-size: .875rem; color: var(--grau); }
   .warnung { margin: .4rem 0 0; font-size: .875rem; color: var(--warn); }
+  .ausgelesen { margin: .5rem 0 0; padding: .55rem .75rem; font-size: .9rem; background: var(--signal-hell); border-radius: 6px; }
   .feldfehler { margin: .4rem 0 0; font-size: .875rem; color: var(--fehler); }
 
   input[type=text], input[type=email], input[type=date], input[type=number], select, textarea {
@@ -189,39 +190,8 @@
     </fieldset>
 
     <fieldset>
-      <legend><span class="nr">2</span> Die Fahrt</legend>
-      <div class="zweispaltig">
-        <div class="feld">
-          <label for="von">Von</label>
-          <input type="text" id="von" name="von" required maxlength="200" placeholder="z. B. Berlin">
-        </div>
-        <div class="feld">
-          <label for="nach">Nach</label>
-          <input type="text" id="nach" name="nach" required maxlength="200" placeholder="z. B. München">
-          <p class="hilfe" id="nach-hinweis" hidden>Für dieses Projekt festgelegt.</p>
-        </div>
-      </div>
-      <div class="feld" role="radiogroup" aria-labelledby="fahrtart-label">
-        <span class="gruppe-label" id="fahrtart-label">Fahrt</span>
-        <div class="kacheln zwei">
-          <label class="kachel"><input type="radio" name="fahrtart" value="Einfache Fahrt" required><span>Einfache Fahrt</span></label>
-          <label class="kachel"><input type="radio" name="fahrtart" value="Hin- und Rückfahrt"><span>Hin- und Rückfahrt</span></label>
-        </div>
-      </div>
-      <div class="zweispaltig">
-        <div class="feld">
-          <label for="reisedatum" id="reisedatum-label">Reisedatum</label>
-          <input type="date" id="reisedatum" name="reisedatum" required>
-        </div>
-        <div class="feld" id="rueck-feld" hidden>
-          <label for="rueckreisedatum">Rückfahrt am</label>
-          <input type="date" id="rueckreisedatum" name="rueckreisedatum" required disabled>
-        </div>
-      </div>
-      <p class="warnung" id="datumswarnung" hidden style="margin:-.6rem 0 1.1rem"></p>
-      <p class="hilfe" style="margin:0 0 1.1rem">Hin und zurück mit unterschiedlichen Verkehrsmitteln? Dann reichen Sie bitte jede Fahrt einzeln ein.</p>
-      <div class="feld" role="radiogroup" aria-labelledby="vm-label">
-        <span class="gruppe-label" id="vm-label">Verkehrsmittel</span>
+      <legend><span class="nr">2</span> Verkehrsmittel</legend>
+      <div class="feld">
         <div class="kacheln">
           <label class="kachel">
             <input type="radio" name="verkehrsmittel" value="Auto" required>
@@ -240,7 +210,7 @@
     </fieldset>
 
     <fieldset>
-      <legend><span class="nr">3</span> Kosten und Belege</legend>
+      <legend><span class="nr">3</span> Beleg und Kosten</legend>
       <p class="platzhalter" id="kosten-leer">Wählen Sie zuerst das Verkehrsmittel aus.</p>
 
       <div class="kosten" data-vm="Auto" hidden>
@@ -271,7 +241,8 @@
         <div class="feld">
           <label for="ticketBahn">Ticket oder Rechnung</label>
           <input type="file" id="ticketBahn" data-art="ticket" accept=".pdf,image/*" multiple required>
-          <p class="hilfe">PDF oder Foto. Bei Hin- und Rückfahrt bitte alle Tickets hochladen.</p>
+          <p class="hilfe">PDF oder Foto. Bei Hin- und Rückfahrt bitte alle Tickets hochladen. Datum, Strecke und Betrag werden daraus übernommen.</p>
+          <p class="ausgelesen" data-auslesen hidden aria-live="polite"></p>
         </div>
         <div class="feld">
           <label for="betragBahn">Betrag in € (insgesamt)</label>
@@ -304,6 +275,8 @@
         <div class="feld">
           <label for="bordkarten">Bordkarten</label>
           <input type="file" id="bordkarten" data-art="bordkarte" accept=".pdf,image/*" multiple required>
+          <p class="hilfe">Datum, Strecke und Betrag werden aus Ticket und Bordkarten übernommen.</p>
+          <p class="ausgelesen" data-auslesen hidden aria-live="polite"></p>
         </div>
         <div class="feld">
           <label for="betragFlug">Betrag in € (insgesamt)</label>
@@ -318,7 +291,42 @@
     </fieldset>
 
     <fieldset>
-      <legend><span class="nr">4</span> Auszahlung</legend>
+      <legend><span class="nr">4</span> Die Fahrt</legend>
+      <p class="hilfe" id="fahrt-hilfe" style="margin:-.5rem 0 1.1rem" hidden>Angaben aus dem Beleg sind bereits eingetragen. Bitte prüfen Sie sie.</p>
+      <div class="zweispaltig">
+        <div class="feld">
+          <label for="von">Von</label>
+          <input type="text" id="von" name="von" required maxlength="200" placeholder="z. B. Berlin">
+        </div>
+        <div class="feld">
+          <label for="nach">Nach</label>
+          <input type="text" id="nach" name="nach" required maxlength="200" placeholder="z. B. München">
+          <p class="hilfe" id="nach-hinweis" hidden>Für dieses Projekt festgelegt.</p>
+        </div>
+      </div>
+      <div class="feld" role="radiogroup" aria-labelledby="fahrtart-label">
+        <span class="gruppe-label" id="fahrtart-label">Fahrt</span>
+        <div class="kacheln zwei">
+          <label class="kachel"><input type="radio" name="fahrtart" value="Einfache Fahrt" required><span>Einfache Fahrt</span></label>
+          <label class="kachel"><input type="radio" name="fahrtart" value="Hin- und Rückfahrt"><span>Hin- und Rückfahrt</span></label>
+        </div>
+      </div>
+      <div class="zweispaltig">
+        <div class="feld">
+          <label for="reisedatum" id="reisedatum-label">Reisedatum</label>
+          <input type="date" id="reisedatum" name="reisedatum" required>
+        </div>
+        <div class="feld" id="rueck-feld" hidden>
+          <label for="rueckreisedatum">Rückfahrt am</label>
+          <input type="date" id="rueckreisedatum" name="rueckreisedatum" required disabled>
+        </div>
+      </div>
+      <p class="warnung" id="datumswarnung" hidden style="margin:-.6rem 0 1.1rem"></p>
+      <p class="hilfe" style="margin:0 0 1.1rem">Hin und zurück mit unterschiedlichen Verkehrsmitteln? Dann reichen Sie bitte jede Fahrt einzeln ein.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="nr">5</span> Auszahlung</legend>
       <div class="feld">
         <label for="kontoinhaber">Kontoinhaber:in</label>
         <input type="text" id="kontoinhaber" name="kontoinhaber" autocomplete="name" required maxlength="120">
@@ -335,14 +343,14 @@
     </fieldset>
 
     <fieldset>
-      <legend><span class="nr">5</span> Bestätigung</legend>
+      <legend><span class="nr">6</span> Bestätigung</legend>
       <label class="haken">
         <input type="checkbox" id="bestaetigung" required>
         <span>Ich versichere, dass die Angaben korrekt sind und die Kosten nicht anderweitig erstattet werden.</span>
       </label>
       <label class="haken">
         <input type="checkbox" id="datenschutz" required>
-        <span>Ich willige ein, dass meine Angaben zur Abwicklung der Erstattung verarbeitet und nach Ablauf der Aufbewahrungsfristen gelöscht werden.<span id="dslink"></span></span>
+        <span>Ich willige ein, dass meine Angaben zur Abwicklung der Erstattung verarbeitet und nach Ablauf der Aufbewahrungsfristen gelöscht werden. Hochgeladene Tickets werden zum automatischen Auslesen an einen KI-Dienst (Anthropic) übermittelt.<span id="dslink"></span></span>
       </label>
     </fieldset>
 
@@ -393,6 +401,10 @@ const MIME_AUS_ENDUNG = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'imag
 const ERLAUBT = Object.values(MIME_AUS_ENDUNG);
 
 class Hinweisfehler extends Error {}
+
+let auslesung = null;            // { werte, signatur } aus dem Backend
+let ausleseLauf = 0;             // verwirft veraltete Antworten
+const vorbereitet = new WeakMap(); // jede Datei nur einmal aufbereiten, damit Auslesen und Absenden identische Daten senden
 
 const euro = n => Number(n).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 const datumDe = iso => { const [j, m, t] = iso.split('-'); return `${t}.${m}.${j}`; };
@@ -456,6 +468,11 @@ function setzeVerkehrsmittel(vm) {
     el.querySelectorAll('input, select, textarea').forEach(i => { i.disabled = !aktiv; });
   });
   $('kosten-leer').hidden = !!vm;
+  auslesung = null;
+  ausleseLauf++;
+  document.querySelectorAll('[data-auslesen]').forEach(el => { el.hidden = true; });
+  const aktiv = vm && document.querySelector(`.kosten[data-vm="${vm}"]`);
+  if (aktiv && [...aktiv.querySelectorAll('input[type=file]')].some(i => i.files.length)) leseBelege(aktiv);
   aktualisiereParkbeleg();
   aktualisiereSchein();
 }
@@ -595,6 +612,91 @@ async function bereiteDateiVor(file, art) {
   return { art, name: file.name, mimeType: mime, base64: await alsBase64(blob), groesse: blob.size };
 }
 
+function bereiteDateiVorGecacht(file, art) {
+  if (!vorbereitet.has(file)) {
+    const p = bereiteDateiVor(file, art);
+    p.catch(() => vorbereitet.delete(file));
+    vorbereitet.set(file, p);
+  }
+  return vorbereitet.get(file);
+}
+
+/* ───── Belege automatisch auslesen ───── */
+const AUSLESE_FEHLER = 'Der Beleg konnte nicht automatisch ausgelesen werden. Bitte füllen Sie die Felder selbst aus.';
+
+async function leseBelege(abschnitt) {
+  const status = abschnitt && abschnitt.querySelector('[data-auslesen]');
+  if (!status) return;
+  const dateien = [...abschnitt.querySelectorAll('input[type=file][data-art]')]
+    .filter(i => i.dataset.art === 'ticket' || i.dataset.art === 'bordkarte')
+    .flatMap(i => [...i.files].map(f => [f, i.dataset.art]));
+  auslesung = null;
+  const lauf = ++ausleseLauf;
+  if (!dateien.length) { status.hidden = true; return; }
+
+  status.hidden = false;
+  status.textContent = 'Beleg wird ausgelesen …';
+  try {
+    const senden = [];
+    for (const [f, art] of dateien.slice(0, 4)) {
+      const { groesse, ...datei } = await bereiteDateiVorGecacht(f, art);
+      senden.push(datei);
+    }
+    const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
+      action: 'auslesen', projektId: projekt.id, verkehrsmittel: form.verkehrsmittel.value, dateien: senden,
+    }) });
+    const json = await res.json();
+    if (lauf !== ausleseLauf) return;
+    if (!json.ok) { status.textContent = AUSLESE_FEHLER; return; }
+
+    auslesung = { werte: json.werte, signatur: json.signatur };
+    const liste = uebernehmeWerte(json.werte, abschnitt);
+    status.textContent = liste.length
+      ? `Aus dem Beleg übernommen: ${liste.join(', ')}. Bitte prüfen Sie die Angaben.`
+      : 'Im Beleg wurden keine Angaben erkannt. Bitte füllen Sie die Felder selbst aus.';
+    if (json.werte.unsicher) status.textContent += ` Hinweis: ${json.werte.unsicher}`;
+  } catch (err) {
+    if (lauf === ausleseLauf) status.textContent = err instanceof Hinweisfehler ? err.message : AUSLESE_FEHLER;
+  }
+}
+
+/** Setzt erkannte Werte, außer in Feldern, die die Person selbst bearbeitet hat. */
+function uebernehmeWerte(w, abschnitt) {
+  const liste = [];
+  const setze = (feld, wert) => {
+    if (!feld || wert == null || wert === '' || feld.readOnly || feld.disabled || feld.dataset.manuell) return false;
+    feld.value = wert;
+    return true;
+  };
+
+  if (w.rueckreisedatum && !form.fahrtart.value) {
+    const rt = form.querySelector('input[name=fahrtart][value="Hin- und Rückfahrt"]');
+    rt.checked = true;
+    setzeFahrtart(rt.value);
+  }
+  let fahrt = false;
+  if (setze($('reisedatum'), w.reisedatum)) { liste.push('Datum'); fahrt = true; }
+  if (setze($('rueckreisedatum'), w.rueckreisedatum)) { liste.push('Rückfahrt'); fahrt = true; }
+  const von = setze($('von'), w.von);
+  const nach = setze($('nach'), w.nach);
+  if (von || nach) { liste.push('Strecke'); fahrt = true; }
+
+  const betragFeld = abschnitt.querySelector('#betragBahn, #betragFlug');
+  if (setze(betragFeld, w.betrag != null ? w.betrag.toFixed(2) : null)) liste.push('Betrag');
+
+  if (w.klasse && abschnitt.querySelector('input[name=klasse]') && !form.querySelector('input[name=klasse][data-manuell]')) {
+    form.querySelector(`input[name=klasse][value="${w.klasse}"]`).checked = true;
+    $('klassenwarnung').hidden = !(w.klasse === '1. Klasse' && !projekt.ersteKlasseErlaubt);
+    liste.push('Klasse');
+  }
+  if (abschnitt.querySelector('#bahncard') && setze($('bahncard'), w.bahncard)) liste.push('BahnCard');
+
+  if (fahrt) $('fahrt-hilfe').hidden = false;
+  pruefeDatum();
+  aktualisiereSchein();
+  return liste;
+}
+
 /* ───── Absenden ───── */
 async function sammleDaten() {
   const vm = form.verkehrsmittel.value;
@@ -633,14 +735,14 @@ async function sammleDaten() {
   let gesamt = 0;
   for (const feld of felder) {
     for (const file of feld.files) {
-      const datei = await bereiteDateiVor(file, feld.dataset.art);
-      gesamt += datei.groesse;
-      delete datei.groesse;
+      const { groesse, ...datei } = await bereiteDateiVorGecacht(file, feld.dataset.art);
+      gesamt += groesse;
       d.dateien.push(datei);
     }
   }
   if (d.dateien.length > (projekt.maxDateien || 8)) throw new Hinweisfehler(`Bitte höchstens ${projekt.maxDateien || 8} Dateien pro Einreichung hochladen.`);
   if (gesamt > MAX_GESAMT_MB * 1024 * 1024) throw new Hinweisfehler(`Die Belege sind zusammen größer als ${MAX_GESAMT_MB} MB. Bitte kleinere Dateien verwenden.`);
+  if (auslesung && (vm === 'Bahn / ÖPNV' || vm === 'Flugzeug')) d.auslesung = auslesung;
   return d;
 }
 
@@ -692,8 +794,10 @@ $('weitere').addEventListener('click', () => {
   const behalten = ['name', 'email', 'kontoinhaber', 'iban'].map(id => [id, $(id).value]);
   form.reset();
   behalten.forEach(([id, v]) => { $(id).value = v; });
+  form.querySelectorAll('[data-manuell]').forEach(el => { delete el.dataset.manuell; });
   setzeVerkehrsmittel(null);
   setzeFahrtart(null);
+  $('fahrt-hilfe').hidden = true;
   $('datumswarnung').hidden = true;
   $('klassenwarnung').hidden = true;
   $('erfolg').hidden = true;
@@ -704,12 +808,15 @@ $('weitere').addEventListener('click', () => {
 
 /* ───── Ereignisse ───── */
 form.addEventListener('change', e => {
+  if (e.isTrusted && e.target.type !== 'file') e.target.dataset.manuell = '1';
+  if (e.target.type === 'file' && e.target.dataset.art !== 'park') leseBelege(e.target.closest('.kosten'));
   if (e.target.name === 'verkehrsmittel') setzeVerkehrsmittel(e.target.value);
   if (e.target.name === 'klasse') $('klassenwarnung').hidden = !(e.target.value === '1. Klasse' && !projekt.ersteKlasseErlaubt);
   if (e.target.name === 'fahrtart') setzeFahrtart(e.target.value);
   if (e.target.id === 'reisedatum' || e.target.id === 'rueckreisedatum') pruefeDatum();
 });
 form.addEventListener('input', e => {
+  if (e.isTrusted && e.target.type !== 'file') e.target.dataset.manuell = '1';
   if (e.target.id === 'parkgebuehren') aktualisiereParkbeleg();
   if (e.target.id === 'iban') { pruefeIban(false); if (!$('ibanfehler').hidden) pruefeIban(true); }
   aktualisiereSchein();
