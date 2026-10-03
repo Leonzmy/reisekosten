@@ -108,6 +108,8 @@
   .kachel input:focus-visible + span { outline: 2px solid var(--signal); outline-offset: 2px; }
   .kacheln.zwei .kachel span { flex-direction: row; justify-content: center; padding: .65rem .5rem; }
 
+  .etappe-titel { margin: .25rem 0 .6rem; font-weight: 700; color: var(--signal); }
+  #rueck-etappe { border-top: 1px solid var(--linie); padding-top: .9rem; margin-top: .2rem; }
   .platzhalter { color: var(--grau); padding: 1rem; border: 1px dashed var(--linie); border-radius: 6px; margin: 0; }
   .pauschale { margin: 0 0 1.1rem; padding: .7rem .9rem; border-left: 3px solid var(--signal); background: var(--flaeche); font-size: .95rem; }
 
@@ -308,16 +310,6 @@
     <fieldset>
       <legend><span class="nr">4</span> Die Fahrt</legend>
       <p class="hilfe" id="fahrt-hilfe" style="margin:-.5rem 0 1.1rem" hidden>Angaben aus dem Beleg sind bereits eingetragen. Bitte prüfen Sie sie.</p>
-      <div class="zweispaltig">
-        <div class="feld">
-          <label for="von">Von</label>
-          <input type="text" id="von" name="von" required maxlength="200" placeholder="z. B. Berlin">
-        </div>
-        <div class="feld">
-          <label for="nach">Nach</label>
-          <input type="text" id="nach" name="nach" required maxlength="200" placeholder="z. B. München">
-        </div>
-      </div>
       <div class="feld" role="radiogroup" aria-labelledby="fahrtart-label">
         <span class="gruppe-label" id="fahrtart-label">Fahrt</span>
         <div class="kacheln zwei">
@@ -325,14 +317,40 @@
           <label class="kachel"><input type="radio" name="fahrtart" value="Hin- und Rückfahrt"><span>Hin- und Rückfahrt</span></label>
         </div>
       </div>
-      <div class="zweispaltig">
-        <div class="feld">
-          <label for="reisedatum" id="reisedatum-label">Reisedatum</label>
-          <input type="date" id="reisedatum" name="reisedatum" required>
+
+      <div class="etappe">
+        <p class="etappe-titel" id="hin-titel" hidden>Hinfahrt</p>
+        <div class="zweispaltig">
+          <div class="feld">
+            <label for="von">Von</label>
+            <input type="text" id="von" name="von" required maxlength="200" placeholder="z. B. Berlin">
+          </div>
+          <div class="feld">
+            <label for="nach">Nach</label>
+            <input type="text" id="nach" name="nach" required maxlength="200" placeholder="z. B. München">
+          </div>
+          <div class="feld">
+            <label for="reisedatum" id="reisedatum-label">Reisedatum</label>
+            <input type="date" id="reisedatum" name="reisedatum" required>
+          </div>
         </div>
-        <div class="feld" id="rueck-feld" hidden>
-          <label for="rueckreisedatum">Rückfahrt am</label>
-          <input type="date" id="rueckreisedatum" name="rueckreisedatum" required disabled>
+      </div>
+
+      <div class="etappe" id="rueck-etappe" hidden>
+        <p class="etappe-titel">Rückfahrt</p>
+        <div class="zweispaltig">
+          <div class="feld">
+            <label for="rueckVon">Von</label>
+            <input type="text" id="rueckVon" name="rueckVon" required disabled maxlength="200">
+          </div>
+          <div class="feld">
+            <label for="rueckNach">Nach</label>
+            <input type="text" id="rueckNach" name="rueckNach" required disabled maxlength="200">
+          </div>
+          <div class="feld">
+            <label for="rueckreisedatum">Datum</label>
+            <input type="date" id="rueckreisedatum" name="rueckreisedatum" required disabled>
+          </div>
         </div>
       </div>
       <p class="warnung" id="datumswarnung" hidden style="margin:-.6rem 0 1.1rem"></p>
@@ -501,11 +519,14 @@ function berechneErstattung() {
   return null;
 }
 
-function scheinHtml(von, nach, hinUndZurueck, datum, rueck, vm, betrag) {
+function scheinHtml(von, nach, hinUndZurueck, datum, rueck, vm, betrag, rueckVon = '', rueckNach = '') {
+  const gleich = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const umgekehrt = (!rueckVon && !rueckNach) || (gleich(rueckVon, nach) && gleich(rueckNach, von));
   const pfeil = hinUndZurueck ? '⇄' : '→';
-  const route = von || nach
-    ? `${esc(von || '…')} ${pfeil} ${esc(nach || '…')}`
-    : `<span class="leer">Von ${pfeil} Nach</span>`;
+  let route;
+  if (!von && !nach) route = `<span class="leer">Von ${pfeil} Nach</span>`;
+  else if (hinUndZurueck && !umgekehrt) route = `${esc(von || '…')} → ${esc(nach || '…')}<br>${esc(rueckVon || '…')} → ${esc(rueckNach || '…')}`;
+  else route = `${esc(von || '…')} ${pfeil} ${esc(nach || '…')}`;
   const daten = [datum, rueck].filter(Boolean).map(datumDe).join(' und ');
   const details = [daten, vm || ''].filter(Boolean).join(', ') || 'Datum und Verkehrsmittel fehlen noch';
   return `<div class="strecke"><div class="route">${route}</div><div class="details">${esc(details)}</div></div>` +
@@ -521,7 +542,8 @@ function aktualisiereSchein() {
   if (!projekt) return;
   const rt = form.fahrtart.value === 'Hin- und Rückfahrt';
   $('fahrschein').innerHTML = scheinHtml($('von').value.trim(), $('nach').value.trim(), rt,
-    $('reisedatum').value, rt ? $('rueckreisedatum').value : '', form.verkehrsmittel.value, berechneErstattung());
+    $('reisedatum').value, rt ? $('rueckreisedatum').value : '', form.verkehrsmittel.value, berechneErstattung(),
+    rt ? $('rueckVon').value.trim() : '', rt ? $('rueckNach').value.trim() : '');
   ausrichtenLochung($('fahrschein'));
 }
 
@@ -545,11 +567,21 @@ function pruefeDatum() {
 
 function setzeFahrtart(art) {
   const rt = art === 'Hin- und Rückfahrt';
-  $('rueck-feld').hidden = !rt;
-  $('rueckreisedatum').disabled = !rt;
-  $('reisedatum-label').textContent = rt ? 'Hinfahrt am' : 'Reisedatum';
+  $('rueck-etappe').hidden = !rt;
+  ['rueckVon', 'rueckNach', 'rueckreisedatum'].forEach(id => { $(id).disabled = !rt; });
+  $('hin-titel').hidden = !rt;
+  $('reisedatum-label').textContent = rt ? 'Datum' : 'Reisedatum';
+  spiegleRueckfahrt();
   pruefeDatum();
   aktualisiereSchein();
+}
+
+/** Belegt die Rückfahrt mit der umgekehrten Strecke vor, solange sie weder selbst bearbeitet noch aus dem Beleg übernommen ist. */
+function spiegleRueckfahrt() {
+  [['rueckVon', 'nach'], ['rueckNach', 'von']].forEach(([ziel, quelle]) => {
+    const feld = $(ziel);
+    if (!feld.dataset.manuell && !feld.dataset.beleg) feld.value = $(quelle).value;
+  });
 }
 
 /* ───── IBAN ───── */
@@ -670,6 +702,9 @@ async function leseBelege(abschnitt) {
     status.textContent = liste.length
       ? `Aus dem Beleg übernommen: ${liste.join(', ')}. Bitte prüfen Sie die Angaben.`
       : 'Im Beleg wurden keine Angaben erkannt. Bitte füllen Sie die Felder selbst aus.';
+    if (json.werte.betragHin != null && json.werte.betragRueck != null) {
+      status.textContent += ` Hinfahrt ${euro(json.werte.betragHin)}, Rückfahrt ${euro(json.werte.betragRueck)}.`;
+    }
     if (json.werte.unsicher) status.textContent += ` Hinweis: ${json.werte.unsicher}`;
   } catch (err) {
     if (lauf === ausleseLauf) status.textContent = err instanceof Hinweisfehler ? err.message : AUSLESE_FEHLER;
@@ -695,7 +730,13 @@ function uebernehmeWerte(w, abschnitt) {
   if (setze($('rueckreisedatum'), w.rueckreisedatum)) { liste.push('Rückfahrt'); fahrt = true; }
   const von = setze($('von'), w.von);
   const nach = setze($('nach'), w.nach);
-  if (von || nach) { liste.push('Strecke'); fahrt = true; }
+  ['rueckVon', 'rueckNach'].forEach(id => { delete $(id).dataset.beleg; });
+  spiegleRueckfahrt();
+  const rueckVon = setze($('rueckVon'), w.rueckVon);
+  const rueckNach = setze($('rueckNach'), w.rueckNach);
+  if (rueckVon) $('rueckVon').dataset.beleg = '1';
+  if (rueckNach) $('rueckNach').dataset.beleg = '1';
+  if (von || nach || rueckVon || rueckNach) { liste.push('Strecke'); fahrt = true; }
 
   const betragFeld = abschnitt.querySelector('#betragBahn, #betragFlug');
   if (setze(betragFeld, w.betrag != null ? w.betrag.toFixed(2) : null)) liste.push('Betrag');
@@ -723,6 +764,8 @@ async function sammleDaten() {
     fahrtart: form.fahrtart.value,
     reisedatum: $('reisedatum').value,
     rueckreisedatum: $('rueckreisedatum').disabled ? '' : $('rueckreisedatum').value,
+    rueckVon: $('rueckVon').disabled ? '' : $('rueckVon').value.trim(),
+    rueckNach: $('rueckNach').disabled ? '' : $('rueckNach').value.trim(),
     von: $('von').value.trim(),
     nach: $('nach').value.trim(),
     verkehrsmittel: vm,
@@ -800,7 +843,7 @@ function zeigeErfolg(json, daten) {
   $('erfolgstext').textContent = `Ihre Einreichung ${json.id} ist eingegangen. Eine Bestätigung geht an ${daten.email}.`;
   const schein = $('erfolgsschein');
   schein.innerHTML = scheinHtml(daten.von, daten.nach, daten.fahrtart === 'Hin- und Rückfahrt',
-    daten.reisedatum, daten.rueckreisedatum, daten.verkehrsmittel, json.erstattung);
+    daten.reisedatum, daten.rueckreisedatum, daten.verkehrsmittel, json.erstattung, daten.rueckVon, daten.rueckNach);
   $('erfolg').hidden = false;
   ausrichtenLochung(schein);
   window.scrollTo(0, 0);
@@ -810,7 +853,7 @@ $('weitere').addEventListener('click', () => {
   const behalten = ['name', 'email', 'kontoinhaber', 'iban'].map(id => [id, $(id).value]);
   form.reset();
   behalten.forEach(([id, v]) => { $(id).value = v; });
-  form.querySelectorAll('[data-manuell]').forEach(el => { delete el.dataset.manuell; });
+  form.querySelectorAll('[data-manuell], [data-beleg]').forEach(el => { delete el.dataset.manuell; delete el.dataset.beleg; });
   setzeVerkehrsmittel(null);
   setzeFahrtart(null);
   $('fahrt-hilfe').hidden = true;
@@ -834,6 +877,7 @@ form.addEventListener('change', e => {
 form.addEventListener('input', e => {
   if (e.isTrusted && e.target.type !== 'file') e.target.dataset.manuell = '1';
   if (e.target.id === 'parkgebuehren') aktualisiereParkbeleg();
+  if (e.target.id === 'von' || e.target.id === 'nach') spiegleRueckfahrt();
   if (e.target.id === 'iban') { pruefeIban(false); if (!$('ibanfehler').hidden) pruefeIban(true); }
   aktualisiereSchein();
 });
