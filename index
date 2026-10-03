@@ -362,7 +362,7 @@
 
 <script>
 /* ───── Einstellungen ───── */
-const API_URL = 'HIER_WEB_APP_URL_EINFUEGEN';   // https://script.google.com/macros/s/…/exec
+const API_URL = 'https://script.google.com/macros/s/AKfycbwNnDYRqlBxFfVV25zGxgOuVGW-2RpV_ZMwvU8xSDTNRF1FW0TaB2oNwoOJUg44n_mnPw/exec';
 const DATENSCHUTZ_URL = '';                      // optional, z. B. https://…/datenschutz
 const MAX_GESAMT_MB = 30;
 const MAX_DATEI_MB = 10;
