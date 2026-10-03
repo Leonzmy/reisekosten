@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Reisekosten einreichen</title>
+<style>
+  /* Systemschriften statt Google Fonts: keine Übertragung von IP-Adressen an Dritte. */
+  :root {
+    --papier: #F1F3F6;
+    --flaeche: #FFFFFF;
+    --tinte: #17202C;
+    --grau: #5A6472;
+    --linie: #CDD4DD;
+    --signal: #1C4F9C;
+    --signal-hell: #E3EBF7;
+    --warn: #8A5300;
+    --warn-hell: #FBF0DA;
+    --fehler: #A8261C;
+    --fehler-hell: #FBE5E2;
+    --ok: #22684A;
+    --schrift: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --papier: #11161D;
+      --flaeche: #19202A;
+      --tinte: #E7EBF0;
+      --grau: #9BA5B3;
+      --linie: #313B48;
+      --signal: #84AAEB;
+      --signal-hell: #1E2B40;
+      --warn: #E6B25E;
+      --warn-hell: #2E2416;
+      --fehler: #F08A80;
+      --fehler-hell: #331B1A;
+      --ok: #7CCBA2;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--tinte);
+    font: 17px/1.5 var(--schrift);
+    padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+  }
+  main { max-width: 38rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+
+  /* Kopf */
+  .traeger { margin: 0 0 .35rem; color: var(--grau); font-size: .95rem; }
+  h1 { margin: 0; font-size: clamp(1.75rem, 6vw, 2.25rem); line-height: 1.15; letter-spacing: -.015em; }
+  .zeitraum { margin: .5rem 0 0; color: var(--grau); }
+  .projekthinweis { margin: 1.25rem 0 0; padding: .9rem 1rem; background: var(--signal-hell); border-radius: 6px; }
+
+  /* Zustände */
+  .status { margin-top: 2rem; padding: 1rem; border-radius: 6px; background: var(--flaeche); border: 1px solid var(--linie); }
+  .status.fehler { background: var(--fehler-hell); border-color: transparent; border-left: 4px solid var(--fehler); }
+
+  /* Abschnitte: echte Reihenfolge, deshalb nummeriert */
+  fieldset { border: 0; margin: 2.75rem 0 0; padding: 0; min-width: 0; }
+  legend { display: flex; align-items: baseline; gap: .6rem; padding: 0; margin-bottom: 1rem; font-size: 1.25rem; font-weight: 700; }
+  legend .nr { color: var(--signal); font-variant-numeric: tabular-nums; }
+
+  .feld { margin-bottom: 1.1rem; }
+  .feld > label, .gruppe-label { display: block; font-weight: 600; font-size: .95rem; margin-bottom: .35rem; }
+  .optional { font-weight: 400; color: var(--grau); }
+  .hilfe { margin: .35rem 0 0; font-size: .875rem; color: var(--grau); }
+  .warnung { margin: .4rem 0 0; font-size: .875rem; color: var(--warn); }
+  .feldfehler { margin: .4rem 0 0; font-size: .875rem; color: var(--fehler); }
+
+  input[type=text], input[type=email], input[type=date], input[type=number], select, textarea {
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    background: var(--flaeche);
+    border: 1px solid var(--linie);
+    border-radius: 6px;
+    padding: .65rem .8rem;
+  }
+  textarea { min-height: 6rem; resize: vertical; }
+  input[type=file] { width: 100%; font: inherit; font-size: .95rem; padding: .6rem; background: var(--flaeche); border: 1px dashed var(--linie); border-radius: 6px; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+    outline: 2px solid var(--signal); outline-offset: 2px;
+  }
+  .iban { font-family: var(--mono); letter-spacing: .03em; }
+  .zweispaltig { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+  @media (max-width: 30rem) { .zweispaltig { grid-template-columns: 1fr; } }
+
+  /* Auswahlkacheln */
+  .kacheln { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
+  .kacheln.zwei { grid-template-columns: repeat(2, 1fr); }
+  .kachel { position: relative; }
+  .kachel input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .kachel span {
+    display: flex; flex-direction: column; align-items: center; gap: .35rem;
+    padding: .85rem .5rem; text-align: center; font-weight: 600; font-size: .95rem;
+    background: var(--flaeche); border: 1px solid var(--linie); border-radius: 6px;
+  }
+  .kachel svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .kachel input:checked + span { border-color: var(--signal); background: var(--signal-hell); color: var(--signal); box-shadow: inset 0 0 0 1px var(--signal); }
+  .kachel input:focus-visible + span { outline: 2px solid var(--signal); outline-offset: 2px; }
+  .kacheln.zwei .kachel span { flex-direction: row; justify-content: center; padding: .65rem .5rem; }
+
+  .platzhalter { color: var(--grau); padding: 1rem; border: 1px dashed var(--linie); border-radius: 6px; margin: 0; }
+  .pauschale { margin: 0 0 1.1rem; padding: .7rem .9rem; border-left: 3px solid var(--signal); background: var(--flaeche); font-size: .95rem; }
+
+  .haken { display: grid; grid-template-columns: auto 1fr; gap: .7rem; align-items: start; margin-bottom: .9rem; font-size: .95rem; }
+  .haken input { width: 1.2rem; height: 1.2rem; margin: .15rem 0 0; accent-color: var(--signal); }
+  .haken a { color: var(--signal); }
+
+  .honig { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
+  /* Fahrschein-Zusammenfassung */
+  .fahrschein {
+    position: relative; margin: 2.75rem 0 1.25rem;
+    display: grid; grid-template-columns: 1fr auto;
+    background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px;
+  }
+  .fahrschein .strecke { padding: 1.1rem 1.25rem; min-width: 0; }
+  .fahrschein .route { font-size: 1.3rem; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+  .fahrschein .route .leer { color: var(--grau); font-weight: 400; }
+  .fahrschein .details { margin-top: .3rem; color: var(--grau); font-size: .9rem; }
+  .fahrschein .betrag {
+    padding: 1.1rem 1.25rem; text-align: right;
+    border-left: 2px dashed var(--linie);
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .fahrschein .summe { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fahrschein .summe-label { color: var(--grau); font-size: .85rem; }
+  /* Lochung an der Perforation */
+  .fahrschein::before, .fahrschein::after {
+    content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--papier); border: 1px solid var(--linie);
+    right: var(--perf, 0); transform: translateX(50%);
+  }
+  .fahrschein::before { top: -10px; clip-path: inset(50% 0 0 0); }
+  .fahrschein::after { bottom: -10px; clip-path: inset(0 0 50% 0); }
+  @media (max-width: 30rem) {
+    .fahrschein { grid-template-columns: 1fr; }
+    .fahrschein .betrag { border-left: 0; border-top: 2px dashed var(--linie); text-align: left; }
+    .fahrschein::before, .fahrschein::after { display: none; }
+  }
+
+  .fehlerliste { margin: 0 0 1.25rem; padding: .9rem 1rem .9rem 1.1rem; background: var(--fehler-hell); border-left: 4px solid var(--fehler); border-radius: 6px; }
+  .fehlerliste p { margin: 0 0 .3rem; font-weight: 600; }
+  .fehlerliste ul { margin: 0; padding-left: 1.2rem; }
+
+  button {
+    font: inherit; font-weight: 700; cursor: pointer; border-radius: 6px; padding: 1rem 1.25rem;
+  }
+  .senden { width: 100%; border: 0; background: var(--signal); color: var(--flaeche); }
+  .senden:disabled { opacity: .65; cursor: progress; }
+  .zweitrangig { background: transparent; color: var(--signal); border: 1px solid var(--signal); }
+
+  .erfolg h2 { font-size: 1.6rem; margin: 2.5rem 0 .5rem; color: var(--ok); }
+  .erfolg .fahrschein { margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="traeger" id="traeger"></p>
+    <h1 id="titel">Reisekosten einreichen</h1>
+    <p class="zeitraum" id="zeitraum"></p>
+    <p class="projekthinweis" id="projekthinweis" hidden></p>
+  </header>
+
+  <div id="status" class="status" role="status">Projekt wird geladen …</div>
+
+  <form id="formular" novalidate hidden>
+    <fieldset>
+      <legend><span class="nr">1</span> Ihre Angaben</legend>
+      <div class="feld">
+        <label for="name">Vor- und Nachname</label>
+        <input type="text" id="name" name="name" autocomplete="name" required maxlength="120">
+      </div>
+      <div class="feld">
+        <label for="email">E-Mail-Adresse</label>
+        <input type="email" id="email" name="email" autocomplete="email" required maxlength="200">
+        <p class="hilfe">Hierhin schicken wir die Eingangsbestätigung.</p>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="nr">2</span> Die Fahrt</legend>
+      <div class="feld">
+        <label for="reisedatum">Reisedatum</label>
+        <input type="date" id="reisedatum" name="reisedatum" required>
+        <p class="warnung" id="datumswarnung" hidden></p>
+      </div>
+      <div class="zweispaltig">
+        <div class="feld">
+          <label for="von">Von</label>
+          <input type="text" id="von" name="von" required maxlength="200" placeholder="z. B. Berlin">
+        </div>
+        <div class="feld">
+          <label for="nach">Nach</label>
+          <input type="text" id="nach" name="nach" required maxlength="200" placeholder="z. B. München">
+        </div>
+      </div>
+      <p class="hilfe" style="margin:-.6rem 0 1.1rem">Pro Fahrt bitte eine Einreichung. Hin- und Rückfahrt mit demselben Verkehrsmittel können Sie zusammen einreichen.</p>
+      <div class="feld" role="radiogroup" aria-labelledby="vm-label">
+        <span class="gruppe-label" id="vm-label">Verkehrsmittel</span>
+        <div class="kacheln">
+          <label class="kachel">
+            <input type="radio" name="verkehrsmittel" value="Auto" required>
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16v-3l2-5h14l2 5v3"/><path d="M3 16h18"/><circle cx="7.5" cy="17" r="1.8"/><circle cx="16.5" cy="17" r="1.8"/></svg>Auto</span>
+          </label>
+          <label class="kachel">
+            <input type="radio" name="verkehrsmittel" value="Bahn / ÖPNV">
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="13" rx="2"/><path d="M6 10h12"/><circle cx="9" cy="13" r=".6"/><circle cx="15" cy="13" r=".6"/><path d="M8 20l2-4M16 20l-2-4"/></svg>Bahn / ÖPNV</span>
+          </label>
+          <label class="kachel">
+            <input type="radio" name="verkehrsmittel" value="Flugzeug">
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 13.5l19-6.5-3 5-8 2 1 5.5-2.5 1-2-5.5-4.5.5z"/></svg>Flugzeug</span>
+          </label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="nr">3</span> Kosten und Belege</legend>
+      <p class="platzhalter" id="kosten-leer">Wählen Sie zuerst das Verkehrsmittel aus.</p>
+
+      <div class="kosten" data-vm="Auto" hidden>
+        <p class="pauschale" id="pauschale"></p>
+        <div class="feld">
+          <label for="kilometer">Gefahrene Kilometer</label>
+          <input type="number" id="kilometer" name="kilometer" inputmode="decimal" min="1" step="0.1" required>
+          <p class="hilfe">Hin- und Rückweg zusammen.</p>
+        </div>
+        <div class="feld">
+          <label for="mitfahrende">Mitfahrende aus dem Projekt <span class="optional">(optional)</span></label>
+          <input type="text" id="mitfahrende" name="mitfahrende" maxlength="300">
+          <p class="hilfe">Mitfahrende reichen für diese Fahrt nichts ein.</p>
+        </div>
+        <div class="zweispaltig">
+          <div class="feld">
+            <label for="parkgebuehren">Parkgebühren in € <span class="optional">(optional)</span></label>
+            <input type="number" id="parkgebuehren" name="parkgebuehren" inputmode="decimal" min="0" step="0.01">
+          </div>
+          <div class="feld">
+            <label for="parkbeleg">Parkbeleg</label>
+            <input type="file" id="parkbeleg" data-art="park" accept=".pdf,image/*">
+          </div>
+        </div>
+      </div>
+
+      <div class="kosten" data-vm="Bahn / ÖPNV" hidden>
+        <div class="feld">
+          <label for="ticketBahn">Ticket oder Rechnung</label>
+          <input type="file" id="ticketBahn" data-art="ticket" accept=".pdf,image/*" multiple required>
+          <p class="hilfe">PDF oder Foto, mehrere Dateien möglich.</p>
+        </div>
+        <div class="feld">
+          <label for="betragBahn">Betrag in €</label>
+          <input type="number" id="betragBahn" inputmode="decimal" min="0.01" step="0.01" required>
+        </div>
+        <div class="feld" role="radiogroup" aria-labelledby="klasse-label">
+          <span class="gruppe-label" id="klasse-label">Klasse</span>
+          <div class="kacheln zwei">
+            <label class="kachel"><input type="radio" name="klasse" value="2. Klasse" required><span>2. Klasse</span></label>
+            <label class="kachel"><input type="radio" name="klasse" value="1. Klasse"><span>1. Klasse</span></label>
+          </div>
+          <p class="warnung" id="klassenwarnung" hidden>In diesem Projekt wird in der Regel nur die 2. Klasse erstattet.</p>
+        </div>
+        <div class="feld">
+          <label for="bahncard">BahnCard</label>
+          <select id="bahncard" required>
+            <option>Keine</option>
+            <option>BahnCard 25</option>
+            <option>BahnCard 50</option>
+            <option>BahnCard 100</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="kosten" data-vm="Flugzeug" hidden>
+        <div class="feld">
+          <label for="ticketFlug">Ticket oder Rechnung</label>
+          <input type="file" id="ticketFlug" data-art="ticket" accept=".pdf,image/*" multiple required>
+        </div>
+        <div class="feld">
+          <label for="bordkarten">Bordkarten</label>
+          <input type="file" id="bordkarten" data-art="bordkarte" accept=".pdf,image/*" multiple required>
+        </div>
+        <div class="feld">
+          <label for="betragFlug">Betrag in €</label>
+          <input type="number" id="betragFlug" inputmode="decimal" min="0.01" step="0.01" required>
+        </div>
+        <div class="feld">
+          <label for="begruendung">Warum war ein Flug nötig?</label>
+          <textarea id="begruendung" required maxlength="2000"></textarea>
+          <p class="hilfe">Zum Beispiel Zeitersparnis gegenüber der Bahn oder ein günstigerer Preis.</p>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="nr">4</span> Auszahlung</legend>
+      <div class="feld">
+        <label for="kontoinhaber">Kontoinhaber:in</label>
+        <input type="text" id="kontoinhaber" name="kontoinhaber" autocomplete="name" required maxlength="120">
+      </div>
+      <div class="feld">
+        <label for="iban">IBAN</label>
+        <input type="text" id="iban" name="iban" class="iban" autocomplete="off" autocapitalize="characters" spellcheck="false" required placeholder="DE00 0000 0000 0000 0000 00">
+        <p class="feldfehler" id="ibanfehler" hidden>Diese IBAN ist ungültig. Bitte prüfen Sie Ihre Eingabe.</p>
+      </div>
+      <div class="feld">
+        <label for="anmerkungen">Anmerkungen <span class="optional">(optional)</span></label>
+        <textarea id="anmerkungen" name="anmerkungen" maxlength="2000"></textarea>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="nr">5</span> Bestätigung</legend>
+      <label class="haken">
+        <input type="checkbox" id="bestaetigung" required>
+        <span>Ich versichere, dass die Angaben korrekt sind und die Kosten nicht anderweitig erstattet werden.</span>
+      </label>
+      <label class="haken">
+        <input type="checkbox" id="datenschutz" required>
+        <span>Ich willige ein, dass meine Angaben zur Abwicklung der Erstattung verarbeitet und nach Ablauf der Aufbewahrungsfristen gelöscht werden.<span id="dslink"></span></span>
+      </label>
+    </fieldset>
+
+    <div class="honig" aria-hidden="true">
+      <label for="website">Website</label>
+      <input type="text" id="website" tabindex="-1" autocomplete="off">
+    </div>
+
+    <div class="fahrschein" id="fahrschein" aria-live="polite">
+      <div class="strecke">
+        <div class="route" id="st-route"><span class="leer">Von → Nach</span></div>
+        <div class="details" id="st-details">Datum und Verkehrsmittel fehlen noch</div>
+      </div>
+      <div class="betrag">
+        <span class="summe" id="st-summe">–</span>
+        <span class="summe-label">voraussichtliche Erstattung</span>
+      </div>
+    </div>
+
+    <div class="fehlerliste" id="fehlerliste" role="alert" hidden></div>
+
+    <button type="submit" class="senden" id="senden">Reisekosten einreichen</button>
+  </form>
+
+  <section class="erfolg" id="erfolg" hidden aria-live="polite">
+    <h2>Eingereicht</h2>
+    <p id="erfolgstext"></p>
+    <div class="fahrschein" id="erfolgsschein"></div>
+    <button type="button" class="zweitrangig" id="weitere">Weitere Fahrt einreichen</button>
+  </section>
+</main>
+
+<script>
+/* ───── Einstellungen ───── */
+const API_URL = 'HIER_WEB_APP_URL_EINFUEGEN';   // https://script.google.com/macros/s/…/exec
+const DATENSCHUTZ_URL = '';                      // optional, z. B. https://…/datenschutz
+const MAX_GESAMT_MB = 30;
+const MAX_DATEI_MB = 10;
+const BILD_MAX_PX = 2400;
+
+/* ───── Grundlagen ───── */
+const $ = id => document.getElementById(id);
+const form = $('formular');
+const projektId = (new URLSearchParams(location.search).get('p') || '').trim();
+let projekt = null;
+
+const MIME_AUS_ENDUNG = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif' };
+const ERLAUBT = Object.values(MIME_AUS_ENDUNG);
+
+class Hinweisfehler extends Error {}
+
+const euro = n => Number(n).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+const datumDe = iso => { const [j, m, t] = iso.split('-'); return `${t}.${m}.${j}`; };
+const zahl = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
+
+function zeigeStatus(text, fehler) {
+  const s = $('status');
+  s.textContent = text;
+  s.className = 'status' + (fehler ? ' fehler' : '');
+  s.hidden = false;
+}
+
+/* ───── Projekt laden ───── */
+async function init() {
+  if (!API_URL.startsWith('https://')) return zeigeStatus('Die Formularadresse ist noch nicht eingerichtet.', true);
+  if (!projektId) return zeigeStatus('Kein Projekt angegeben. Bitte öffnen Sie den Link aus Ihrer Einladung.', true);
+  try {
+    const res = await fetch(`${API_URL}?action=projekt&p=${encodeURIComponent(projektId)}`);
+    const json = await res.json();
+    if (!json.ok) return zeigeStatus((json.fehler && json.fehler[0]) || 'Projekt nicht gefunden.', true);
+    projekt = json.projekt;
+  } catch (err) {
+    return zeigeStatus('Das Projekt konnte nicht geladen werden. Bitte laden Sie die Seite neu.', true);
+  }
+
+  document.title = `Reisekosten – ${projekt.name}`;
+  $('traeger').textContent = projekt.traeger || '';
+  $('titel').textContent = projekt.name;
+  if (projekt.beginn && projekt.ende) {
+    $('zeitraum').textContent = `Reisekostenerstattung für den Projektzeitraum ${datumDe(projekt.beginn)} bis ${datumDe(projekt.ende)}`;
+  } else {
+    $('zeitraum').textContent = 'Reisekostenerstattung';
+  }
+  if (projekt.hinweis) { $('projekthinweis').textContent = projekt.hinweis; $('projekthinweis').hidden = false; }
+
+  let p = `Erstattet werden ${euro(projekt.pauschale)} pro Kilometer`;
+  if (projekt.maxAuto > 0) p += `, höchstens ${euro(projekt.maxAuto)} pro Fahrt`;
+  $('pauschale').textContent = p + '.';
+
+  if (DATENSCHUTZ_URL) {
+    $('dslink').innerHTML = ` <a href="${DATENSCHUTZ_URL}" target="_blank" rel="noopener">Datenschutzhinweise</a>`;
+  }
+
+  $('status').hidden = true;
+  form.hidden = false;
+}
+
+/* ───── Verkehrsmittel und abhängige Felder ───── */
+function setzeVerkehrsmittel(vm) {
+  document.querySelectorAll('.kosten').forEach(el => {
+    const aktiv = el.dataset.vm === vm;
+    el.hidden = !aktiv;
+    el.querySelectorAll('input, select, textarea').forEach(i => { i.disabled = !aktiv; });
+  });
+  $('kosten-leer').hidden = !!vm;
+  aktualisiereParkbeleg();
+  aktualisiereSchein();
+}
+
+function aktualisiereParkbeleg() {
+  $('parkbeleg').required = !$('parkbeleg').disabled && zahl($('parkgebuehren').value) > 0;
+}
+
+function berechneErstattung() {
+  const vm = form.verkehrsmittel.value;
+  if (vm === 'Auto') {
+    const km = zahl($('kilometer').value);
+    if (!(km > 0)) return null;
+    let fahrt = km * projekt.pauschale;
+    if (projekt.maxAuto > 0) fahrt = Math.min(fahrt, projekt.maxAuto);
+    return fahrt + (zahl($('parkgebuehren').value) || 0);
+  }
+  if (vm === 'Bahn / ÖPNV') return zahl($('betragBahn').value);
+  if (vm === 'Flugzeug') return zahl($('betragFlug').value);
+  return null;
+}
+
+function scheinHtml(von, nach, datum, vm, betrag) {
+  const route = von || nach
+    ? `${esc(von || '…')} → ${esc(nach || '…')}`
+    : '<span class="leer">Von → Nach</span>';
+  const details = [datum ? datumDe(datum) : '', vm || ''].filter(Boolean).join(', ') || 'Datum und Verkehrsmittel fehlen noch';
+  return `<div class="strecke"><div class="route">${route}</div><div class="details">${esc(details)}</div></div>` +
+    `<div class="betrag"><span class="summe">${betrag != null ? euro(betrag) : '–'}</span>` +
+    `<span class="summe-label">voraussichtliche Erstattung</span></div>`;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function aktualisiereSchein() {
+  if (!projekt) return;
+  $('fahrschein').innerHTML = scheinHtml($('von').value.trim(), $('nach').value.trim(),
+    $('reisedatum').value, form.verkehrsmittel.value, berechneErstattung());
+  ausrichtenLochung($('fahrschein'));
+}
+
+function ausrichtenLochung(schein) {
+  const betrag = schein.querySelector('.betrag');
+  if (betrag) schein.style.setProperty('--perf', betrag.offsetWidth + 'px');
+}
+
+function pruefeDatum() {
+  const d = $('reisedatum').value;
+  const w = $('datumswarnung');
+  const ausserhalb = d && ((projekt.beginn && d < projekt.beginn) || (projekt.ende && d > projekt.ende));
+  w.hidden = !ausserhalb;
+  if (ausserhalb) w.textContent = 'Das Datum liegt außerhalb des Projektzeitraums. Sie können trotzdem einreichen, wir prüfen das.';
+}
+
+/* ───── IBAN ───── */
+function normIban(v) { return String(v).replace(/\s+/g, '').toUpperCase(); }
+
+function ibanGueltig(s) {
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
+  if (s.startsWith('DE') && s.length !== 22) return false;
+  let rest = 0;
+  for (const ch of s.slice(4) + s.slice(0, 4)) {
+    const ziffern = /[A-Z]/.test(ch) ? String(ch.charCodeAt(0) - 55) : ch;
+    for (const z of ziffern) rest = (rest * 10 + Number(z)) % 97;
+  }
+  return rest === 1;
+}
+
+function pruefeIban(anzeigen) {
+  const feld = $('iban');
+  const s = normIban(feld.value);
+  const ok = !s || ibanGueltig(s);
+  feld.setCustomValidity(ok ? '' : 'Ungültige IBAN');
+  if (anzeigen) $('ibanfehler').hidden = ok;
+  return ok;
+}
+
+/* ───── Dateien ───── */
+function mimeVon(file) {
+  if (file.type && ERLAUBT.includes(file.type)) return file.type;
+  const endung = (file.name.split('.').pop() || '').toLowerCase();
+  return MIME_AUS_ENDUNG[endung] || file.type || '';
+}
+
+async function verkleinere(file) {
+  try {
+    const bild = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const faktor = Math.min(1, BILD_MAX_PX / Math.max(bild.width, bild.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bild.width * faktor);
+    canvas.height = Math.round(bild.height * faktor);
+    canvas.getContext('2d').drawImage(bild, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.85));
+    return blob && blob.size < file.size ? blob : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function alsBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = () => reject(new Hinweisfehler('Eine Datei konnte nicht gelesen werden.'));
+    r.readAsDataURL(blob);
+  });
+}
+
+async function bereiteDateiVor(file, art) {
+  let mime = mimeVon(file);
+  if (!ERLAUBT.includes(mime)) throw new Hinweisfehler(`„${file.name}“: Bitte nur PDF-Dateien oder Fotos hochladen.`);
+  let blob = file;
+  if (['image/jpeg', 'image/png', 'image/webp'].includes(mime) && file.size > 1.5 * 1024 * 1024) {
+    const klein = await verkleinere(file);
+    if (klein) { blob = klein; mime = 'image/jpeg'; }
+  }
+  if (blob.size > MAX_DATEI_MB * 1024 * 1024) throw new Hinweisfehler(`„${file.name}“ ist größer als ${MAX_DATEI_MB} MB.`);
+  return { art, name: file.name, mimeType: mime, base64: await alsBase64(blob), groesse: blob.size };
+}
+
+/* ───── Absenden ───── */
+async function sammleDaten() {
+  const vm = form.verkehrsmittel.value;
+  const d = {
+    projektId: projekt.id,
+    name: $('name').value.trim(),
+    email: $('email').value.trim(),
+    reisedatum: $('reisedatum').value,
+    von: $('von').value.trim(),
+    nach: $('nach').value.trim(),
+    verkehrsmittel: vm,
+    kontoinhaber: $('kontoinhaber').value.trim(),
+    iban: normIban($('iban').value),
+    anmerkungen: $('anmerkungen').value.trim(),
+    bestaetigung: $('bestaetigung').checked,
+    datenschutz: $('datenschutz').checked,
+    website: $('website').value,
+    dateien: [],
+  };
+  if (vm === 'Auto') {
+    d.kilometer = $('kilometer').value;
+    d.mitfahrende = $('mitfahrende').value.trim();
+    d.parkgebuehren = $('parkgebuehren').value;
+  } else if (vm === 'Bahn / ÖPNV') {
+    d.betrag = $('betragBahn').value;
+    d.klasse = form.klasse.value;
+    d.bahncard = $('bahncard').value;
+  } else if (vm === 'Flugzeug') {
+    d.betrag = $('betragFlug').value;
+    d.begruendung = $('begruendung').value.trim();
+  }
+
+  const felder = [...form.querySelectorAll('input[type=file][data-art]')].filter(i => !i.disabled);
+  let gesamt = 0;
+  for (const feld of felder) {
+    for (const file of feld.files) {
+      const datei = await bereiteDateiVor(file, feld.dataset.art);
+      gesamt += datei.groesse;
+      delete datei.groesse;
+      d.dateien.push(datei);
+    }
+  }
+  if (d.dateien.length > (projekt.maxDateien || 8)) throw new Hinweisfehler(`Bitte höchstens ${projekt.maxDateien || 8} Dateien pro Einreichung hochladen.`);
+  if (gesamt > MAX_GESAMT_MB * 1024 * 1024) throw new Hinweisfehler(`Die Belege sind zusammen größer als ${MAX_GESAMT_MB} MB. Bitte kleinere Dateien verwenden.`);
+  return d;
+}
+
+function zeigeFehler(liste) {
+  const box = $('fehlerliste');
+  if (!liste.length) { box.hidden = true; box.innerHTML = ''; return; }
+  box.innerHTML = '<p>Bitte korrigieren Sie Folgendes:</p><ul>' + liste.map(f => `<li>${esc(f)}</li>`).join('') + '</ul>';
+  box.hidden = false;
+  box.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+}
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  zeigeFehler([]);
+  pruefeIban(true);
+  if (!form.reportValidity()) return;
+
+  const knopf = $('senden');
+  knopf.disabled = true;
+  knopf.textContent = 'Belege werden vorbereitet …';
+  try {
+    const daten = await sammleDaten();
+    knopf.textContent = 'Wird gesendet …';
+    const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(daten) });
+    const json = await res.json();
+    if (json.ok) zeigeErfolg(json, daten);
+    else zeigeFehler(json.fehler && json.fehler.length ? json.fehler : ['Die Einreichung wurde nicht angenommen.']);
+  } catch (err) {
+    zeigeFehler([err instanceof Hinweisfehler ? err.message
+      : 'Die Einreichung konnte nicht übertragen werden. Bitte prüfen Sie Ihre Internetverbindung und senden Sie erneut.']);
+  } finally {
+    knopf.disabled = false;
+    knopf.textContent = 'Reisekosten einreichen';
+  }
+});
+
+function zeigeErfolg(json, daten) {
+  form.hidden = true;
+  $('erfolgstext').textContent = `Ihre Einreichung ${json.id} ist eingegangen. Eine Bestätigung geht an ${daten.email}.`;
+  const schein = $('erfolgsschein');
+  schein.innerHTML = scheinHtml(daten.von, daten.nach, daten.reisedatum, daten.verkehrsmittel, json.erstattung);
+  $('erfolg').hidden = false;
+  ausrichtenLochung(schein);
+  window.scrollTo(0, 0);
+}
+
+$('weitere').addEventListener('click', () => {
+  const behalten = ['name', 'email', 'kontoinhaber', 'iban'].map(id => [id, $(id).value]);
+  form.reset();
+  behalten.forEach(([id, v]) => { $(id).value = v; });
+  setzeVerkehrsmittel(null);
+  $('datumswarnung').hidden = true;
+  $('klassenwarnung').hidden = true;
+  $('erfolg').hidden = true;
+  form.hidden = false;
+  window.scrollTo(0, 0);
+  $('reisedatum').focus();
+});
+
+/* ───── Ereignisse ───── */
+form.addEventListener('change', e => {
+  if (e.target.name === 'verkehrsmittel') setzeVerkehrsmittel(e.target.value);
+  if (e.target.name === 'klasse') $('klassenwarnung').hidden = !(e.target.value === '1. Klasse' && !projekt.ersteKlasseErlaubt);
+  if (e.target.id === 'reisedatum') pruefeDatum();
+});
+form.addEventListener('input', e => {
+  if (e.target.id === 'parkgebuehren') aktualisiereParkbeleg();
+  if (e.target.id === 'iban') { pruefeIban(false); if (!$('ibanfehler').hidden) pruefeIban(true); }
+  aktualisiereSchein();
+});
+$('iban').addEventListener('blur', e => {
+  const s = normIban(e.target.value);
+  e.target.value = s.replace(/(.{4})/g, '$1 ').trim();
+  pruefeIban(true);
+});
+$('name').addEventListener('blur', () => {
+  if (!$('kontoinhaber').value) $('kontoinhaber').value = $('name').value.trim();
+});
+window.addEventListener('resize', () => ausrichtenLochung($('fahrschein')));
+
+setzeVerkehrsmittel(null);
+init().then(aktualisiereSchein);
+</script>
+</body>
+</html>
