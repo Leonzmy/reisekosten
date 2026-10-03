@@ -647,7 +647,10 @@ async function leseBelege(abschnitt) {
     }) });
     const json = await res.json();
     if (lauf !== ausleseLauf) return;
-    if (!json.ok) { status.textContent = AUSLESE_FEHLER; return; }
+    if (!json.ok) {
+      status.textContent = AUSLESE_FEHLER + (json.fehler && json.fehler[0] ? ` (${json.fehler[0]})` : '');
+      return;
+    }
 
     auslesung = { werte: json.werte, signatur: json.signatur };
     const liste = uebernehmeWerte(json.werte, abschnitt);
