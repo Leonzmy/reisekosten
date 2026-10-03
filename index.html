@@ -438,6 +438,31 @@ let auslesung = null;            // { werte, signatur } aus dem Backend
 let ausleseLauf = 0;             // verwirft veraltete Antworten
 const vorbereitet = new WeakMap(); // jede Datei nur einmal aufbereiten, damit Auslesen und Absenden identische Daten senden
 
+/* Browser-Autofill füllt beim Ausfüllen von Name/E-Mail gern auch Orte und Daten mit gespeicherten Werten.
+   Reisefelder übernehmen deshalb nur Eingaben, während sie selbst den Fokus haben; alles andere wird verworfen. */
+const REISEFELDER = ['von', 'nach', 'rueckVon', 'rueckNach', 'reisedatum', 'rueckreisedatum',
+  'kilometer', 'mitfahrende', 'parkgebuehren', 'betragBahn', 'betragFlug', 'begruendung', 'anmerkungen'];
+const gemerkt = {};
+function merkeReisefelder() { REISEFELDER.forEach(id => { gemerkt[id] = $(id).value; }); }
+function vomBrowserAusgefuellt(feld) {
+  for (const sel of [':autofill', ':-webkit-autofill']) {
+    try { if (feld.matches(sel)) return true; } catch (err) { /* Selektor nicht unterstützt */ }
+  }
+  return false;
+}
+function verwerfeFremdeingaben() {
+  REISEFELDER.forEach(id => {
+    const feld = $(id);
+    const fremd = feld !== document.activeElement || vomBrowserAusgefuellt(feld);
+    if (fremd && feld.value !== (gemerkt[id] || '')) feld.value = gemerkt[id] || '';
+  });
+}
+const istFremdeingabe = e => REISEFELDER.includes(e.target.id)
+  && (e.target !== document.activeElement || vomBrowserAusgefuellt(e.target));
+
+// Bis zum ersten erfolgreichen Auslesen hat das Ticket Vorrang vor allem, was schon in den Feldern steht.
+let belegVorrang = true;
+
 const euro = n => Number(n).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 const datumDe = iso => { const [j, m, t] = iso.split('-'); return `${t}.${m}.${j}`; };
 const zahl = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
@@ -493,6 +518,7 @@ function setzeVerkehrsmittel(vm) {
   });
   $('kosten-leer').hidden = !!vm;
   auslesung = null;
+  belegVorrang = true;
   ausleseLauf++;
   document.querySelectorAll('[data-auslesen]').forEach(el => { el.hidden = true; });
   const aktiv = vm && document.querySelector(`.kosten[data-vm="${vm}"]`);
@@ -539,6 +565,7 @@ function esc(s) {
 }
 
 function aktualisiereSchein() {
+  merkeReisefelder(); // wird nach jeder gewollten Änderung aufgerufen
   if (!projekt) return;
   const rt = form.fahrtart.value === 'Hin- und Rückfahrt';
   $('fahrschein').innerHTML = scheinHtml($('von').value.trim(), $('nach').value.trim(), rt,
@@ -715,7 +742,9 @@ async function leseBelege(abschnitt) {
 function uebernehmeWerte(w, abschnitt) {
   const liste = [];
   const setze = (feld, wert) => {
-    if (!feld || wert == null || wert === '' || feld.readOnly || feld.disabled || feld.dataset.manuell) return false;
+    if (!feld || wert == null || wert === '' || feld.readOnly || feld.disabled) return false;
+    if (feld.dataset.manuell && !belegVorrang) return false;
+    delete feld.dataset.manuell;
     feld.value = wert;
     return true;
   };
@@ -741,7 +770,7 @@ function uebernehmeWerte(w, abschnitt) {
   const betragFeld = abschnitt.querySelector('#betragBahn, #betragFlug');
   if (setze(betragFeld, w.betrag != null ? w.betrag.toFixed(2) : null)) liste.push('Betrag');
 
-  if (w.klasse && abschnitt.querySelector('input[name=klasse]') && !form.querySelector('input[name=klasse][data-manuell]')) {
+  if (w.klasse && abschnitt.querySelector('input[name=klasse]') && (belegVorrang || !form.querySelector('input[name=klasse][data-manuell]'))) {
     form.querySelector(`input[name=klasse][value="${w.klasse}"]`).checked = true;
     $('klassenwarnung').hidden = !(w.klasse === '1. Klasse' && !projekt.ersteKlasseErlaubt);
     liste.push('Klasse');
@@ -749,6 +778,7 @@ function uebernehmeWerte(w, abschnitt) {
   if (abschnitt.querySelector('#bahncard') && setze($('bahncard'), w.bahncard)) liste.push('BahnCard');
 
   if (fahrt) $('fahrt-hilfe').hidden = false;
+  belegVorrang = false;
   pruefeDatum();
   aktualisiereSchein();
   return liste;
@@ -867,6 +897,8 @@ $('weitere').addEventListener('click', () => {
 
 /* ───── Ereignisse ───── */
 form.addEventListener('change', e => {
+  verwerfeFremdeingaben();
+  if (istFremdeingabe(e)) return;
   if (e.isTrusted && e.target.type !== 'file') e.target.dataset.manuell = '1';
   if (e.target.type === 'file' && e.target.dataset.art !== 'park') leseBelege(e.target.closest('.kosten'));
   if (e.target.name === 'verkehrsmittel') setzeVerkehrsmittel(e.target.value);
@@ -875,6 +907,8 @@ form.addEventListener('change', e => {
   if (e.target.id === 'reisedatum' || e.target.id === 'rueckreisedatum') pruefeDatum();
 });
 form.addEventListener('input', e => {
+  verwerfeFremdeingaben();
+  if (istFremdeingabe(e)) return;
   if (e.isTrusted && e.target.type !== 'file') e.target.dataset.manuell = '1';
   if (e.target.id === 'parkgebuehren') aktualisiereParkbeleg();
   if (e.target.id === 'von' || e.target.id === 'nach') spiegleRueckfahrt();
@@ -891,6 +925,7 @@ $('name').addEventListener('blur', () => {
 });
 window.addEventListener('resize', () => ausrichtenLochung($('fahrschein')));
 
+REISEFELDER.forEach(id => $(id).setAttribute('autocomplete', 'off'));
 setzeVerkehrsmittel(null);
 init().then(aktualisiereSchein);
 </script>
